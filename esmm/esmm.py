@@ -212,12 +212,14 @@ def my_model(features, labels, mode, params):
   with tf.variable_scope('cvr_model'):
     cvr_logits = build_mode(features, mode, params)
 
-  ctr_predictions = tf.sigmoid(ctr_logits)
-  prop = tf.multiply(ctr_predictions, tf.sigmoid(cvr_logits))
+  ctr_predictions = tf.sigmoid(ctr_logits, name="CTR")
+  cvr_predictions = tf.sigmoid(cvr_logits, name="CVR")
+  prop = tf.multiply(ctr_predictions, cvr_predictions, name="CTCVR")
   if mode == tf.estimator.ModeKeys.PREDICT:
     predictions = {
       'probabilities': prop,
-      'ctr_probabilities': ctr_predictions
+      'ctr_probabilities': ctr_predictions,
+      'cvr_probabilities': cvr_predictions
     }
     export_outputs = {
       'prediction': tf.estimator.export.PredictOutput(predictions)
