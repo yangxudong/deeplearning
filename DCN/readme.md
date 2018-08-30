@@ -2,6 +2,8 @@
 
 本文在详细介绍Deep & Cross Network网络结构的基础上，给出了高效实现DCN模型的tensorflow代码，主要点出了网络上一些主流实现中常犯的错误，让你真正能够在企业级的生产环境中玩转DCN模型。
 
+[阅读原文](https://yangxudong.github.io/dcn/):[https://zhuanlan.zhihu.com/p/43364598](https://zhuanlan.zhihu.com/p/43364598)
+
 ## 使用说明
 
 准备好训练和评估数据，接着执行下面的脚本。
