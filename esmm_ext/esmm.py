@@ -2,6 +2,7 @@ import tensorflow as tf
 from tensorflow.python.estimator.canned import optimizers
 from .din_logit_fn import din_logit_fn
 from .dcn_logit_fn import dcn_logit_fn
+from .dupn_logit_fn import dupn_logit_fn
 
 def _base_logit_fn(features, mode, params):
   net = tf.feature_column.input_layer(features, params['feature_columns'])
@@ -26,7 +27,7 @@ class ESMM(tf.estimator.Estimator):
   ):
     if not optimizer: optimizer = 'Adagrad'
     self.optimizer = optimizers.get_optimizer_instance(optimizer, params["learning_rate"])
-    self.logit_fn_dict = {"base": _base_logit_fn, "din": din_logit_fn, "dcn": dcn_logit_fn}
+    self.logit_fn_dict = {"base": _base_logit_fn, "din": din_logit_fn, "dcn": dcn_logit_fn, "dupn": dupn_logit_fn}
 
     def _model_fn(features, labels, mode, params):
       logit_fn = self.logit_fn_dict[params["sub_model"]]

@@ -1,3 +1,4 @@
+#-*- coding: UTF-8 -*-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -9,7 +10,6 @@ import sys
 #sys.setdefaultencoding("utf-8")
 sys.path.append(os.getcwd())
 from .esmm import *
-from .dcn_input_fn import *
 
 flags = tf.app.flags
 flags.DEFINE_string("model_dir", "./model_dir", "Base directory for the model.")
@@ -19,14 +19,16 @@ flags.DEFINE_string("eval_data", "data/eval", "Path to the evaluation data.")
 flags.DEFINE_integer("train_steps", 10000, "Number of (global) training steps to perform")
 flags.DEFINE_integer("batch_size", 256, "Training batch size")
 flags.DEFINE_integer("shuffle_buffer_size", 10000, "dataset shuffle buffer size")
-flags.DEFINE_float("learning_rate", 0.0005, "Learning rate")
+flags.DEFINE_float("learning_rate", 0.005, "Learning rate")
+flags.DEFINE_string("optimizer", "Adagrad", "optimizer method")
+flags.DEFINE_integer("num_units", 128, "state size of LSTM cell")
 flags.DEFINE_string("hidden_units", "512,256,128", "Comma-separated list of number of units in each hidden layer of the NN")
 flags.DEFINE_string("attention_hidden_units", "32,16",
                     "Comma-separated list of number of units in each hidden layer of the attention layer")
 flags.DEFINE_float("dropout_rate", 0.25, "Drop out rate")
 flags.DEFINE_integer("num_parallel_readers", 10, "number of parallel readers for training data")
 flags.DEFINE_integer("save_checkpoints_steps", 5000, "Save checkpoints every this many steps")
-flags.DEFINE_string("sub_model", "dcn", "Type of sub network")
+flags.DEFINE_string("sub_model", "dupn", "Type of sub network")
 flags.DEFINE_string("gpu", "", "which gpu to use.")
 flags.DEFINE_string("ps_hosts", "s-xiasha-10-2-176-43.hx:2222",
                     "Comma-separated list of hostname:port pairs")
@@ -104,8 +106,11 @@ def parse_argument():
   os.environ["TF_CLUSTER_DEF"] = json.dumps(cluster)
 
 
-def dcn_model_params(feature_columns):
-  return {
+def dcn_model_params(train_files, eval_files):
+  import ESMM.dcn_input_fn as dcn
+  feature_columns = dcn.create_feature_columns()
+  feature_spec = tf.feature_column.make_parse_example_spec(feature_columns)
+  params = {
     'sub_model': 'dcn',
     'learning_rate': FLAGS.learning_rate,
     'use_batch_norm': FLAGS.use_batch_norm,
@@ -113,12 +118,15 @@ def dcn_model_params(feature_columns):
     'num_cross_layers': FLAGS.num_cross_layers,
     'feature_columns': feature_columns
   }
+  input_fn=lambda: dcn.train_input_fn(train_files, feature_spec, FLAGS.batch_size, FLAGS.shuffle_buffer_size, FLAGS.num_parallel_readers)
+  input_fn_for_eval = lambda: dcn.eval_input_fn(eval_files, feature_spec, FLAGS.batch_size)
+  return input_fn, input_fn_for_eval, params, feature_spec
 
 
-def din_model_params(feature_columns):
-  return {
+def din_model_params(train_files, eval_files):
+  params = {
       'sub_model': 'din',
-      'feature_columns': feature_columns,
+      #'feature_columns': feature_columns,
       'hidden_units': FLAGS.hidden_units.split(','),
       'learning_rate': FLAGS.learning_rate,
       'attention_hidden_units': FLAGS.attention_hidden_units.split(','),
@@ -138,6 +146,67 @@ def din_model_params(feature_columns):
       },
       'dropout_rate': FLAGS.dropout_rate
   }
+  other_feature_spec = {
+      "behaviorBids": tf.FixedLenFeature([20], tf.int64),
+      "behaviorCids": tf.FixedLenFeature([20], tf.int64),
+      "behaviorC1ids": tf.FixedLenFeature([10], tf.int64),
+      "behaviorSids": tf.FixedLenFeature([20], tf.int64),
+      "behaviorPids": tf.FixedLenFeature([20], tf.int64),
+      "productId": tf.FixedLenFeature([], tf.int64),
+      "sellerId": tf.FixedLenFeature([], tf.int64),
+      "brandId": tf.FixedLenFeature([], tf.int64),
+      "cate1Id": tf.FixedLenFeature([], tf.int64),
+      "cateId": tf.FixedLenFeature([], tf.int64)
+  }
+
+
+def dupn_model_params(train_files, eval_files):
+  import ESMM.dupn_input_fn as dupn
+  user_feature_columns = dupn.create_user_feature_columns()
+  other_feature_columns = dupn.create_feature_columns()
+  feature_spec = tf.feature_column.make_parse_example_spec(user_feature_columns + other_feature_columns)
+  other_feature_spec = {
+    "behaviorBids": tf.FixedLenFeature([60], tf.int64),
+    "behaviorCids": tf.FixedLenFeature([60], tf.int64),
+    "behaviorC1ids": tf.FixedLenFeature([60], tf.int64),
+    "behaviorSids": tf.FixedLenFeature([60], tf.int64),
+    "behaviorPids": tf.FixedLenFeature([60], tf.int64),
+    "behaviorTypes": tf.FixedLenFeature([60], tf.int64),
+    "behaviorTimeBucket": tf.FixedLenFeature([60], tf.int64),
+    "behaviorTimeIsWeekend": tf.FixedLenFeature([60], tf.int64),
+    "behaviorTimeWeight": tf.FixedLenFeature([60], tf.float32),
+    "behaviorScenarios": tf.FixedLenFeature([60], tf.int64),
+    "productId": tf.FixedLenFeature([], tf.int64),
+    "sellerId": tf.FixedLenFeature([], tf.int64),
+    "brandId": tf.FixedLenFeature([], tf.int64),
+    "cate1Id": tf.FixedLenFeature([], tf.int64),
+    "cateId": tf.FixedLenFeature([], tf.int64)
+  }
+  feature_spec.update(other_feature_spec)
+  params = {
+    'sub_model': 'dupn',
+    'user_feature_columns': user_feature_columns,
+    'other_feature_columns': other_feature_columns,
+    'hidden_units': FLAGS.hidden_units.split(','),
+    'attention_hidden_units': FLAGS.attention_hidden_units.split(','),
+    'learning_rate': FLAGS.learning_rate,
+    'dropout_rate': FLAGS.dropout_rate,
+    'num_units': FLAGS.num_units,
+    'batch_size': FLAGS.batch_size,
+    'pid_vocab_size': 150000,
+    'pid_embedding_size': 48,
+    'bid_vocab_size': 10000,
+    'bid_embedding_size': 16,
+    'sid_vocab_size': 10000,
+    'sid_embedding_size': 16,
+    'cid_vocab_size': 10000,
+    'cid_embedding_size': 16,
+    'c1id_vocab_size': 100,
+    'c1id_embedding_size': 8,
+  }
+  input_fn=lambda: dupn.train_input_fn(train_files, feature_spec, FLAGS.batch_size, FLAGS.shuffle_buffer_size, FLAGS.num_parallel_readers)
+  input_fn_for_eval = lambda: dupn.eval_input_fn(eval_files, feature_spec, FLAGS.batch_size)
+  return input_fn, input_fn_for_eval, params, feature_spec
 
 
 def main(unused_argv):
@@ -157,42 +226,28 @@ def main(unused_argv):
   print("eval_data:", eval_files)
   print("train steps:", FLAGS.train_steps, "batch_size:", FLAGS.batch_size)
   print("shuffle_buffer_size:", FLAGS.shuffle_buffer_size)
-  feature_columns = create_feature_columns()
-  params = {"dcn": dcn_model_params, "din": din_model_params}[FLAGS.sub_model](feature_columns)
-  estimator = ESMM(
-    params=params,
-    optimizer='Adam',
-    config=tf.estimator.RunConfig(model_dir=FLAGS.model_dir, save_checkpoints_steps=FLAGS.save_checkpoints_steps)
-  )
-  feature_spec = tf.feature_column.make_parse_example_spec(feature_columns)
-  if FLAGS.sub_model == "din":
-    other_feature_spec = {
-      "behaviorBids": tf.FixedLenFeature([20], tf.int64),
-      "behaviorCids": tf.FixedLenFeature([20], tf.int64),
-      "behaviorC1ids": tf.FixedLenFeature([10], tf.int64),
-      "behaviorSids": tf.FixedLenFeature([20], tf.int64),
-      "behaviorPids": tf.FixedLenFeature([20], tf.int64),
-      "productId": tf.FixedLenFeature([], tf.int64),
-      "sellerId": tf.FixedLenFeature([], tf.int64),
-      "brandId": tf.FixedLenFeature([], tf.int64),
-      "cate1Id": tf.FixedLenFeature([], tf.int64),
-      "cateId": tf.FixedLenFeature([], tf.int64)
-    }
-    feature_spec.update(other_feature_spec)
+
+  # 目前支持两种子模型
+  model_params_fn = {"dcn": dcn_model_params, "dupn": dupn_model_params}[FLAGS.sub_model]
+  train_input_fn, eval_input_fn, params, feature_spec = model_params_fn(train_files, eval_files)
 
   train_spec = tf.estimator.TrainSpec(
-    input_fn=lambda: train_input_fn(train_files, feature_spec, FLAGS.batch_size, FLAGS.shuffle_buffer_size, FLAGS.num_parallel_readers),
+    input_fn=train_input_fn,
     max_steps=FLAGS.train_steps
   )
-  input_fn_for_eval = lambda: eval_input_fn(eval_files, feature_spec, FLAGS.batch_size)
-  eval_spec = tf.estimator.EvalSpec(input_fn=input_fn_for_eval, throttle_secs=300, steps=None)
+  eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn, throttle_secs=300, steps=None)
 
+  estimator = ESMM(
+    params=params,
+    optimizer= FLAGS.optimizer,
+    config=tf.estimator.RunConfig(model_dir=FLAGS.model_dir, save_checkpoints_steps=FLAGS.save_checkpoints_steps)
+  )
   print("before train and evaluate")
   tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
   print("after train and evaluate")
 
   # Evaluate accuracy.
-  results = estimator.evaluate(input_fn=input_fn_for_eval)
+  results = estimator.evaluate(input_fn=eval_input_fn)
   for key in sorted(results): print('%s: %s' % (key, results[key]))
   print("after evaluate")
 

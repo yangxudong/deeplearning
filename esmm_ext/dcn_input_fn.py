@@ -100,6 +100,7 @@ def create_feature_columns():
     fc.categorical_column_with_vocabulary_list("phoneOs", ["android", "ios"], default_value=0))
   tab = fc.indicator_column(fc.categorical_column_with_vocabulary_list("tab",
         ["ALL", "TongZhuang", "XieBao", "MuYing", "NvZhuang", "MeiZhuang", "JuJia", "MeiShi"], default_value=0))
+  userType = fc.numeric_column("user_type", default_value=1, dtype=tf.int64)
 
   pid_embed = fc.shared_embedding_columns([pids, pid], 64, combiner='sqrtn', shared_embedding_collection_name="pid")
   bid_embed = fc.shared_embedding_columns([bids, bid], 32, combiner='sqrtn', shared_embedding_collection_name="bid")
@@ -117,7 +118,7 @@ def create_feature_columns():
     slr_pay_qty_1d, slr_pay_qty_1w, slr_pay_qty_2w, slr_pay_qty_1m,
     slr_brd_pay_qty_1d, slr_brd_pay_qty_1w, slr_brd_pay_qty_2w, slr_brd_pay_qty_1m,
     weighted_ipv, cat1_weighted_ipv, cate_weighted_ipv, slr_weighted_ipv, brd_weighted_ipv,
-    cms_scale, cms_scale_sqrt]
+    cms_scale, cms_scale_sqrt, userType]
   feature_columns += pid_embed
   feature_columns += sid_embed
   feature_columns += bid_embed
@@ -134,8 +135,7 @@ def create_feature_columns():
 def parse_exmp(serial_exmp, feature_spec):
   click = fc.numeric_column("click", default_value=0, dtype=tf.int64)
   pay = fc.numeric_column("pay", default_value=0, dtype=tf.int64)
-  userType = fc.numeric_column("user_type", default_value=1, dtype=tf.int64)
-  fea_columns = [click, pay, userType]
+  fea_columns = [click, pay]
   feature_spec.update(tf.feature_column.make_parse_example_spec(fea_columns))
   feats = tf.parse_single_example(serial_exmp, features=feature_spec)
   feats["modified_time_sqrt"] = tf.sqrt(feats["modified_time"])
@@ -151,7 +151,6 @@ def train_input_fn(filenames, feature_spec, batch_size, shuffle_buffer_size, num
   files = tf.data.Dataset.list_files(filenames)
   dataset = files.apply(tf.contrib.data.parallel_interleave(tf.data.TFRecordDataset, cycle_length=num_parallel_readers))
   dataset = dataset.map(lambda x: parse_exmp(x, feature_spec), num_parallel_calls=8)
-  dataset = dataset.filter(lambda x, y: tf.equal(tf.unstack(x["user_type"])[0], 0)) # only keep normal user samples
   # Shuffle, repeat, and batch the examples.
   if shuffle_buffer_size > 0:
     dataset = dataset.shuffle(shuffle_buffer_size)
@@ -165,8 +164,7 @@ def train_input_fn(filenames, feature_spec, batch_size, shuffle_buffer_size, num
 def eval_input_fn(filename, feature_spec, batch_size):
   dataset = tf.data.TFRecordDataset(filename)
   dataset = dataset.map(lambda x: parse_exmp(x, feature_spec), num_parallel_calls=8)
-  dataset = dataset.filter(lambda x, y: tf.equal(tf.unstack(x["user_type"])[0], 0)) # only keep normal user samples
   # Shuffle, repeat, and batch the examples.
-  dataset = dataset.batch(batch_size)
+  dataset = dataset.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
   # Return the read end of the pipeline.
   return dataset
