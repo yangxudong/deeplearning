@@ -140,7 +140,7 @@ def main(unused_argv):
     max_steps=FLAGS.train_steps
   )
   input_fn_for_eval = lambda: eval_input_fn(eval_files, feature_spec)
-  eval_spec = tf.estimator.EvalSpec(input_fn=input_fn_for_eval, throttle_secs=300)
+  eval_spec = tf.estimator.EvalSpec(input_fn=input_fn_for_eval, throttle_secs=300, steps=None)
 
   print("before train and evaluate")
   tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
