@@ -119,6 +119,8 @@ def parse_exmp(serial_exmp, feature_spec):
   feats["modified_time_sqrt"] = tf.sqrt(feats["modified_time"])
   feats["modified_time_square"] = tf.square(feats["modified_time"])
   feats["cms_scale_sqrt"] = tf.sqrt(feats["cms_scale"])
+  if "behaviorTypes" in feats:
+    feats["behaviorTypes"] = feats["behaviorTypes"] - 1
   click = feats.pop('click')
   pay = feats.pop('pay')
   return feats, {'ctr': tf.to_float(click), 'cvr': tf.to_float(pay)}

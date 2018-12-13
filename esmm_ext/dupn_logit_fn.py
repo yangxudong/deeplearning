@@ -46,9 +46,9 @@ def get_behavior_embedding(params, features):
     item_emb = tf.concat([pid, bid, sid, cid, c1id], -1)  # shape(batch_size, embedding_size)
 
     behavior_hour = tf.one_hot(features["behaviorTimeBucket"], 8, dtype=tf.float32)  # shape: (batch_size, seq_len, 8)
+    behavior_type = tf.one_hot(features["behaviorTypes"], 5, dtype=tf.float32)
     behavior_weekend = tf.expand_dims(tf.to_float(features["behaviorTimeIsWeekend"]), -1)
     behavior_weight = tf.expand_dims(features["behaviorTimeWeight"], -1)
-    behavior_type = tf.expand_dims(tf.to_float(features["behaviorTypes"]), -1)
     behavior_scenario = tf.expand_dims(tf.to_float(features["behaviorScenarios"]), -1)
     behvr_columns = [pids, bids, sids, cids, c1ids,
                      behavior_hour, behavior_weekend, behavior_weight, behavior_type, behavior_scenario]
