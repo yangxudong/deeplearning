@@ -273,8 +273,8 @@ def dupn_model_fn(features, labels, mode, params):
   inputs = tf.concat([behvr_emb, property_emb], -1)
   print("lstm inputs shape:", inputs.shape)
   lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(num_units=params["num_units"])
-  initial_state = lstm_cell.zero_state(params["batch_size"], tf.float32)
-  outputs, state = tf.nn.dynamic_rnn(lstm_cell, inputs, initial_state=initial_state)
+  #initial_state = lstm_cell.zero_state(params["batch_size"], tf.float32)
+  outputs, state = tf.nn.dynamic_rnn(lstm_cell, inputs, dtype=tf.float32)
   print("lstm output shape:", outputs.shape)
 
   masks = tf.cast(features["behaviorPids"] >= 0, tf.float32)

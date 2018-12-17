@@ -92,8 +92,8 @@ def dupn_logit_fn(features, mode, params):
   print("item_emb shape:", item_emb.shape)
 
   lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(num_units=params["num_units"])
-  initial_state = lstm_cell.zero_state(params["batch_size"], tf.float32)
-  outputs, state = tf.nn.dynamic_rnn(lstm_cell, behvr_emb, initial_state=initial_state)
+  #initial_state = lstm_cell.zero_state(params["batch_size"], tf.float32) # this will cause failure when serving
+  outputs, state = tf.nn.dynamic_rnn(lstm_cell, behvr_emb, dtype=tf.float32)
   print("lstm output shape:", outputs.shape)
 
   masks = tf.cast(features["behaviorPids"] >= 0, tf.float32)
