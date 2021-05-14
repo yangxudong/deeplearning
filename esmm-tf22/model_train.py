@@ -72,8 +72,7 @@ def train_model(cate_feature_dict, user_cate_feature_dict, item_cate_feature_dic
 	                shuffle=True)
 	
 	# save as tf_serving model
-	# saved_model_path = './esmm/{}'.format(int(time.time()))
+	saved_model_path = './esmm/{}'.format(int(time.time()))
 	# ctcvr_model = tf.keras.models.load_model('esmm_best.h5')
-	# tf.saved_model.save(ctcvr_model, saved_model_path)
-	tf.saved_model.save(ctcvr_model, filepath)
+	tf.saved_model.save(ctcvr_model, saved_model_path)
 	return ctcvr_model
